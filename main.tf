@@ -28,7 +28,6 @@ resource "azurerm_linux_virtual_machine" "server01" {
   }
 
   os_disk {
-    name                 = "osdisk-server01"
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
@@ -65,7 +64,6 @@ resource "azurerm_linux_virtual_machine" "server02" {
   }
 
   os_disk {
-    name                 = "osdisk-server02"
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
