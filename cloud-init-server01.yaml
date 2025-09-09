@@ -1,0 +1,99 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+timezone: "America/Sao_Paulo"
+
+packages:
+  - nginx
+  - php-fpm
+  - php-mysql
+  - php-cli
+  - unzip
+  - curl
+  - mariadb-client
+  - certbot
+  - python3-certbot-nginx
+
+write_files:
+  # SSH - Altera a porta de 22 para 2222
+  - path: /etc/ssh/sshd_config.d/port-override.conf
+    permissions: "0644"
+    content: |
+      Port 2222
+      PasswordAuthentication no
+      PermitRootLogin no
+
+  # App PHP simples (usa DB na server02)
+  - path: /var/www/html/index.php
+    permissions: '0644'
+    owner: www-data:www-data
+    content: |
+      <?php
+      $db_host = "${server02_private_ip}";
+      $db_name = "${db_name}";
+      $db_user = "${db_user}";
+      $db_pass = "${db_password}";
+      try {
+        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
+          PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $rows = $pdo->query("SELECT NOW() AS agora")->fetchAll();
+        $ok = "OK";
+      } catch (Exception $e) {
+        $ok = "ERRO: " . $e->getMessage();
+        $rows = [];
+      }
+      ?>
+      <!doctype html>
+      <html>
+        <head><meta charset="utf-8"><title>PI na Nuvem</title></head>
+        <body>
+          <h1>Meu PI (Projeto Integrador) na Nuvem</h1>
+          <p>PHP + Nginx (server01) → MariaDB (server02)</p>
+          <ul>
+            <li><b>Status conexao DB:</b> <?php echo $ok; ?></li>
+            <li><b>server01 (Web):</b> 10.0.0.4</li>
+            <li><b>server02 (DB):</b> 10.0.0.5</li>
+            <li><b>Agora (DB):</b> <?php echo isset($rows[0]['agora']) ? $rows[0]['agora'] : '—'; ?></li>
+          </ul>
+          <p>Porta SSH desta VM: 2222</p>
+        </body>
+      </html>
+
+  # Nginx basico (HTTP). O certbot vai editar para HTTPS com redirect.
+  - path: /etc/nginx/sites-available/default
+    permissions: '0644'
+    content: |
+      server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name ${server01_domain};
+        root /var/www/html;
+        index index.php index.html;
+
+        location / {
+          try_files $uri $uri/ /index.php?$args;
+        }
+
+        location ~ \.php$ {
+          include snippets/fastcgi-php.conf;
+          fastcgi_pass unix:/run/php/php-fpm.sock;
+        }
+
+        # Opcional: seguranca bsica (cabecalhos)
+        add_header X-Content-Type-Options nosniff;
+        add_header X-Frame-Options SAMEORIGIN;
+      }
+
+runcmd:
+  # Reinicia servicos instalados
+  - systemctl enable --now php-fpm || systemctl enable --now php8.2-fpm
+  - nginx -t && systemctl reload nginx
+  - systemctl restart ssh
+
+  # Lets Encrypt
+  - certbot --nginx -d ${server01_domain} --non-interactive --agree-tos -m ${letsencrypt_email} --redirect || true
+
+  # Reiniciar Nginx apos certbot
+  - nginx -t && systemctl reload nginx
