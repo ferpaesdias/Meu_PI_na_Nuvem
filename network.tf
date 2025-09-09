@@ -76,7 +76,7 @@ resource "azurerm_network_security_group" "nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["2222", "22"]
+    destination_port_ranges    = ["2222"]
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }

@@ -4,6 +4,7 @@ package_upgrade: true
 timezone: "America/Sao_Paulo"
 
 packages:
+  - git
   - nginx
   - php-fpm
   - php-mysql
@@ -23,70 +24,43 @@ write_files:
       PasswordAuthentication no
       PermitRootLogin no
 
-  # App PHP simples (usa DB na server02)
-  - path: /var/www/html/index.php
-    permissions: '0644'
-    owner: www-data:www-data
-    content: |
-      <?php
-      $db_host = "${server02_private_ip}";
-      $db_name = "${db_name}";
-      $db_user = "${db_user}";
-      $db_pass = "${db_password}";
-      try {
-        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
-          PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
-        $rows = $pdo->query("SELECT NOW() AS agora")->fetchAll();
-        $ok = "OK";
-      } catch (Exception $e) {
-        $ok = "ERRO: " . $e->getMessage();
-        $rows = [];
-      }
-      ?>
-      <!doctype html>
-      <html>
-        <head><meta charset="utf-8"><title>PI na Nuvem</title></head>
-        <body>
-          <h1>Meu PI (Projeto Integrador) na Nuvem</h1>
-          <p>PHP + Nginx (server01) → MariaDB (server02)</p>
-          <ul>
-            <li><b>Status conexao DB:</b> <?php echo $ok; ?></li>
-            <li><b>server01 (Web):</b> 10.0.0.4</li>
-            <li><b>server02 (DB):</b> 10.0.0.5</li>
-            <li><b>Agora (DB):</b> <?php echo isset($rows[0]['agora']) ? $rows[0]['agora'] : '—'; ?></li>
-          </ul>
-          <p>Porta SSH desta VM: 2222</p>
-        </body>
-      </html>
-
-  # Nginx basico (HTTP). O certbot vai editar para HTTPS com redirect.
+  # Nginx - Configuracao para o Crud
   - path: /etc/nginx/sites-available/default
-    permissions: '0644'
+    permissions: "0644"
     content: |
       server {
-        listen 80 default_server;
-        listen [::]:80 default_server;
+        listen 80;
+        listen [::]:80;
+
+        root /var/www/html/sistema;
+        index index.php index.html index.htm;
+
         server_name ${server01_domain};
-        root /var/www/html;
-        index index.php index.html;
 
         location / {
-          try_files $uri $uri/ /index.php?$args;
+          try_files $uri $uri/ =404;
         }
 
         location ~ \.php$ {
           include snippets/fastcgi-php.conf;
-          fastcgi_pass unix:/run/php/php-fpm.sock;
+          fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        }  
+  
+        location ~ /\.ht {
+          deny all;
         }
-
-        # Opcional: seguranca bsica (cabecalhos)
-        add_header X-Content-Type-Options nosniff;
-        add_header X-Frame-Options SAMEORIGIN;
       }
 
 runcmd:
+  # Download do sistema CRUD
+  - curl -L -o /var/www/html/repo.zip https://github.com/ferpaesdias/Meu_PI_na_Nuvem/archive/refs/heads/main.zip
+  - cd /var/www/html
+  - unzip -q repo.zip "Meu_PI_na_Nuvem-main/sistema/*"
+  - mv Meu_PI_na_Nuvem-main/sistema ./sistema
+  - rm -rf Meu_PI_na_Nuvem-main repo.zip
+  - chown -R www-data:www-data /var/www/html/sistema
+  - chmod -R 755 /var/www/html/sistema
+
   # Reinicia servicos instalados
   - systemctl enable --now php-fpm || systemctl enable --now php8.2-fpm
   - nginx -t && systemctl reload nginx
