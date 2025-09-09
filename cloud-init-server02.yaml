@@ -41,7 +41,7 @@ runcmd:
   - mysql -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'${server01_private_ip}'; FLUSH PRIVILEGES;"
 
   - mkdir -p /tmp/sistema
-  - curl -X GET -L -o /tmp/sistema/banco_de_dados.sql https://raw.githubusercontent.com/ferpaesdias/Meu_PI_na_Nuvem/refs/heads/add_sistema/sistema/banco_de_dados.sql
+  - curl -X GET -L -o /tmp/sistema/banco_de_dados.sql https://raw.githubusercontent.com/ferpaesdias/Meu_PI_na_Nuvem/refs/heads/main/sistema/banco_de_dados.sql
   - chmod 0644 /tmp/sistema/banco_de_dados.sql
   - mariadb meuprojeto < /tmp/sistema/banco_de_dados.sql
 
