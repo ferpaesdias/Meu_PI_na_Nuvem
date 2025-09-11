@@ -70,13 +70,13 @@ resource "azurerm_network_security_group" "nsg" {
 
   # Permite SSH (2222)
   security_rule {
-    name                       = "allow-ssh"
+    name                       = "allow-ssh2222"
     priority                   = 100
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["2222", "22"]
+    destination_port_ranges    = ["2222"]
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
